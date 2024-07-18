@@ -12,10 +12,11 @@
 ## Service Enumeration:
 1. As usual, scan the machine for open ports via rustscan!
 > Rustscan:
-![Screenshot 2024-07-17 102523](https://github.com/user-attachments/assets/5764091f-a89d-4167-80dd-480f689fbed8)
+
+> └> export RHOSTS=10.10.115.32
+![Screenshot 2024-07-18 105815](https://github.com/user-attachments/assets/08562343-536d-417d-8521-96ef3d397b28)
 
 2. According to rustscan result, we have 1 port is opened:
-
 - Open Port: 80
 - Service: Apache httpd 2.4.29 ((Ubuntu))
 
@@ -52,7 +53,9 @@
 
 11. Then, we can enumerate subdomain via ffuf:
 > └> ffuf -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt -u http://incognito.com/ -H "Host: FUZZ.incognito.com" -fs 20637 -t 100
+
 > [...]
+
 > dev                     [Status: 200, Size: 57, Words: 5, Lines: 2, Duration: 218ms]
 
 12. Found subdomain: dev
@@ -63,7 +66,8 @@ Then add that subdomain to /etc/hosts:
 
 13. dev:
 > └> curl http://dev.incognito.com/    
-<h1 style="text-align: center;">Only for Developers</h1>
+> h1 style="text-align: center;">Only for Developers</h1>
+
 Hmm… Developers only.
 
 14. Let’s check out the robots.txt crawler file:
@@ -150,3 +154,131 @@ I’m user www-data!
 
 ## Privilege Escalation
 ### www-data to dev2
+Let’s do some basic enumerations!
+
+1. System users:
+
+![Screenshot 2024-07-18 102026](https://github.com/user-attachments/assets/bd09eeb4-fc10-4d9f-8c2c-68c6ce9ba360)
+
+Found 2 user: dev1, dev2
+
+3. Found secret key in /var/www/incognito.com/:
+![Screenshot 2024-07-18 102236](https://github.com/user-attachments/assets/4d7b5e69-f76e-49fa-857d-81b1d4bddd34)
+
+4. Also, I found that we can Switch User to dev2 without password!
+![Screenshot 2024-07-18 102319](https://github.com/user-attachments/assets/3c65e195-fd42-4d74-a719-954c85fb28b0)
+I’m user dev2!
+
+### dev2 to dev1
+> dev2@incognito:/$ cat /var/mail/dev1 
+
+> Hey, your password has been changed, {Redacted}.
+
+> Knock yourself in!
+Found dev1 password!
+However, it looks like a password hash.
+
+1. Let’s crack it:
+
+![Screenshot 2024-07-18 102540](https://github.com/user-attachments/assets/60d06bc4-4245-4eb4-b460-0ca21e2f582a)
+
+2. Cracked! Let’s Switch User to dev1:
+> dev2@incognito:/$ su dev1
+
+> Password: 
+
+> su: Permission denied
+Hmm?
+
+3. In the netstat command output, we see port 22 is opened:
+![Screenshot 2024-07-18 102812](https://github.com/user-attachments/assets/017f9df9-df14-4262-ab80-9f482d30c9ab)
+
+4. Let’s try to SSH into it:
+
+![Screenshot 2024-07-18 102826](https://github.com/user-attachments/assets/658f9f7c-dbf8-4107-967a-aa6fd1830c30)
+
+Umm…
+Let’s take a step back.
+
+5. In the dev1’s mail, we see:
+> Knock yourself in!
+Which is referring to port knocking!
+
+6. Now, we can check the /etc/knockd.conf config file:
+
+![Screenshot 2024-07-18 103020](https://github.com/user-attachments/assets/e4884040-7a92-4380-b00f-ecabc53ed589)
+
+8. As you can see, it has 2 port knocking sequences:
+> Open SSH: 5020 -> 6120 -> 7340
+
+> Close SSH: 9000 -> 8000 -> 7000
+
+8. Armed with above information, we can open the SSH service by knocking port 5020, 6120, 7340:
+![Screenshot 2024-07-18 103116](https://github.com/user-attachments/assets/2219dde9-cf13-4fab-b924-36102f602fd5)
+
+9. We now should able to SSH to dev1:
+
+![Screenshot 2024-07-18 103122](https://github.com/user-attachments/assets/180ac4a7-e642-4429-ac25-3b103b4c1e87)
+
+Wait. Wrong password?
+
+11. Maybe the password is the MD5 hash one?
+![image](https://github.com/user-attachments/assets/8f0cf2f7-4d16-4776-838a-581a5a6b0ea9)
+Oh! It’s the MD5 hash one!
+
+And I’m user dev1!
+
+### dev1 to root
+1. Sudo permission:
+![Screenshot 2024-07-18 103947](https://github.com/user-attachments/assets/e6a22064-acbe-4a3f-9608-52fe5932a367)
+
+2. In user dev1, we can run /etc/init.d/knockdstartups script as root!
+> dev1@incognito:~$ sudo /etc/init.d/knockd
+
+> * Usage: /etc/init.d/knockd {start|stop|restart|reload|force-reload}
+
+3. However, we don’t have write access to it, so we couldn’t swap the knockd SH script to our evil script:
+> dev1@incognito:~$ cd /etc/init.d/
+
+> dev1@incognito:/etc/init.d$ ls -lah knockd
+
+> -rwxr-xr-x 1 root root 1.8K Oct  8  2016 knockd
+
+4. Hmm… How about /etc/knockd.conf?
+> dev1@incognito:/etc/init.d$ ls -lah /etc/knockd.conf
+
+> -rw-rw-r--+ 1 root root 349 Jun 11  2021 /etc/knockd.conf
+We have write access to it!
+
+5. Armed with above information, we can modify the command key’s value to add a SUID sticky bit to /bin/bash:
+![Screenshot 2024-07-18 104349](https://github.com/user-attachments/assets/1dffc285-634e-4a09-a0bb-9e70e31621bf)
+
+6. Then, restart knockd and knock port 5020, 6120, 7340 again:
+> dev1@incognito:/etc/init.d$ sudo /etc/init.d/knockd restart
+
+> [ ok ] Restarting knockd (via systemctl): knockd.service.
+
+> └> knock -v $RHOSTS 5020 6120 7340
+
+> hitting tcp 10.10.115.32:5020
+
+> hitting tcp 10.10.115.32:6120
+
+> hitting tcp 10.10.115.32:7340
+
+
+> dev1@incognito:/etc/init.d$ ls -lah /tmp/root_bash 
+
+> -rwsr-sr-x 1 root root 1.1M Jan 24 06:25 /tmp/root_bash
+We did it!
+
+7. Let’s spawn a root Bash shell!
+![image](https://github.com/user-attachments/assets/d404912f-6171-404f-8e13-242d03b10940)
+I’m root! :D
+
+## Rooted
+root.txt:
+
+> root_bash-4.4# cat /root/root.txt
+
+> 9dcb607e31348671de36b9eb7446cb59

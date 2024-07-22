@@ -1,4 +1,5 @@
 # [Different CTF](https://tryhackme.com/r/room/adana)
+Author: Nayanjyoti Kumar
 ----
 Interesting room, you can shoot the sun
 ----

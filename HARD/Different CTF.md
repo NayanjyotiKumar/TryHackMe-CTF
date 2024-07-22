@@ -4,6 +4,8 @@ Author: Nayanjyoti Kumar
 Interesting room, you can shoot the sun
 ----
 
+![d4f7722b23452cbec5416193f4b55aa6](https://github.com/user-attachments/assets/9c248d2d-8200-492d-99f2-6e39c06f9c7b)
+
 ## Task 1: Basic scan
 ```
 ┌──(nayan㉿kali)-[~/Downloads]
@@ -116,7 +118,7 @@ Target: http://10.10.27.15/
 
 
 
-### Task 2  Localhost
+## Task 2: Localhost
 
 ```
 download the 2 files

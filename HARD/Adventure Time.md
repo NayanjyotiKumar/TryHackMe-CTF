@@ -319,6 +319,14 @@ tryhackme{P1ngu1nsRul3!}
 
 ---
 
+### Flag 5
+
+```text
+tryhackme{Th1s1s4c0d3F0rBM0}
+```
+
+---
+
 ## Flags Obtained
 
 | Flag   | Value                         |
@@ -327,6 +335,7 @@ tryhackme{P1ngu1nsRul3!}
 | Flag 2 | tryhackme{N1c30n3Sp0rt}       |
 | Flag 3 | tryhackme{N0Bl4ckM4g1cH3r3}   |
 | Flag 4 | tryhackme{P1ngu1nsRul3!}      |
+| Flag 5 | tryhackme{Th1s1s4c0d3F0rBM0}  |
 
 ---
 
